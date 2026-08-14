@@ -1,0 +1,14 @@
+{
+  "name": "iPodify",
+  "short_name": "iPodify",
+  "description": "Mid-2000s Bluetooth-radio styled YouTube music player.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#10141a",
+  "theme_color": "#10141a",
+  "icons": [
+    { "src": "/icon.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any" },
+    { "src": "/icon.png", "sizes": "1254x1254", "type": "image/png", "purpose": "maskable" }
+  ]
+}
