@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PlayerProvider } from './store/PlayerContext'
 import { BackgroundShader } from './components/BackgroundShader'
 import { Header } from './components/Header'
@@ -16,6 +16,26 @@ import { InfoView } from './components/InfoView'
 export default function App() {
   const [view, setView] = useState('devices')
   const [queueOpen, setQueueOpen] = useState(false)
+
+  // Tactile button-click sound (`public/button.mp3`), played for every
+  // <button> press via event delegation. Sound starts inside the click
+  // gesture so autoplay policies allow it; a missing file fails silently.
+  useEffect(() => {
+    let audio = null
+    const playClick = () => {
+      try {
+        if (!audio) audio = new Audio('/button.mpeg')
+        audio.currentTime = 0
+        audio.volume = 0.5
+        audio.play().catch(() => { })
+      } catch { }
+    }
+    const onClick = (e) => {
+      if (e.target.closest('button')) playClick()
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [])
 
   return (
     <PlayerProvider>
