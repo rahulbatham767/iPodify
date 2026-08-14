@@ -3,11 +3,11 @@ import { Icon } from './Icon'
 
 const SIGNAL_BARS = [20, 40, 60, 80]
 
-export function DeviceList() {
+export function DeviceList({ className = 'ml-11 mt-2 mb-4 space-y-3', onSelect }) {
   const { devices, activeDeviceId, connectedDeviceId, scanning, pairing, selectDevice } = usePlayer()
 
   return (
-    <div className="ml-11 mt-2 mb-4 space-y-3">
+    <div className={className}>
       {scanning && (
         <div className="flex items-center justify-between pr-4 animate-pulse">
           <div className="flex items-center gap-2">
@@ -24,7 +24,10 @@ export function DeviceList() {
             key={device.id}
             type="button"
             disabled={pairing}
-            onClick={() => selectDevice(device.id)}
+            onClick={() => {
+              selectDevice(device.id)
+              onSelect?.()
+            }}
             className={`w-full flex items-center justify-between pr-4 group cursor-pointer disabled:opacity-50 text-left ${
               isConnected ? '' : 'opacity-80'
             }`}

@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { usePlayer } from '../store/PlayerContext'
 import { useListeners } from '../hooks/useListeners'
+import { DevicePicker } from './DevicePicker'
 import { Icon } from './Icon'
 
 export function Header({ onToggleQueue, onNavigate }) {
   const { connectedDevice, pairing } = usePlayer()
   const { listeners, enabled } = useListeners()
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   return (
     <header className="bg-surface-container border-b-2 border-outline-variant bg-surface-dim border-b-2 border-black/50 ring-1 ring-inset ring-white/10 shadow-[0px_2px_0px_0px_rgba(0,0,0,0.8)] grid grid-cols-[1fr_auto_1fr] items-center w-full px-3 md:px-10 py-2 h-14 sm:h-16 fixed top-0 z-50">
@@ -45,7 +48,7 @@ export function Header({ onToggleQueue, onNavigate }) {
           </span>
         </div>
         <div className="flex items-center gap-2 md:gap-4 text-primary shrink-0">
-          <button type="button" className="hover:text-tertiary hover:brightness-125 transition-all active:translate-y-[1px]" aria-label="Bluetooth">
+          <button type="button" onClick={() => setPickerOpen(true)} className="hover:text-tertiary hover:brightness-125 transition-all active:translate-y-[1px]" aria-label="Select device">
             <Icon name="bluetooth_connected" filled />
           </button>
           <button type="button" onClick={() => onNavigate('settings')} className="hover:text-tertiary hover:brightness-125 transition-all active:translate-y-[1px]" aria-label="Settings">
@@ -53,6 +56,7 @@ export function Header({ onToggleQueue, onNavigate }) {
           </button>
         </div>
       </div>
+      <DevicePicker open={pickerOpen} onClose={() => setPickerOpen(false)} />
     </header>
   )
 }
