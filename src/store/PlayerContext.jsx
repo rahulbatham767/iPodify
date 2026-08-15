@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { loadDeviceQueue, describeError, extractVideoId, fetchVideoInfo } from '../lib/youtube'
+import { loadDeviceQueue, describeError, extractVideoId, fetchVideoInfo, setApiProxyEnabled } from '../lib/youtube'
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer'
 import { useMediaSession } from '../hooks/useMediaSession'
 import { useDeviceStore } from './useDeviceStore'
@@ -32,13 +32,17 @@ export function PlayerProvider({ children }) {
   const liveVideoIdRef = useRef(extractVideoId(import.meta.env.VITE_LIVE_STREAM_ID))
   const [radioInfo, setRadioInfo] = useState(null)
 
-  // Admin endpoint override (runtime, shared) beats the env live stream.
+  // Admin endpoint overrides (runtime, shared) beat the env defaults: live
+  // stream + API-key proxy mode.
   useEffect(() => {
     let alive = true
     fetchAdminConfig().then((cfg) => {
-      if (!alive || !cfg?.liveStreamId) return
-      const videoId = extractVideoId(cfg.liveStreamId)
-      if (videoId) liveVideoIdRef.current = videoId
+      if (!alive || !cfg) return
+      setApiProxyEnabled(cfg.apiKeySet)
+      if (cfg.liveStreamId) {
+        const videoId = extractVideoId(cfg.liveStreamId)
+        if (videoId) liveVideoIdRef.current = videoId
+      }
     })
     return () => {
       alive = false

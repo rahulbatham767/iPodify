@@ -46,8 +46,9 @@ function memoryCount(now) {
   return sessions.size
 }
 
-// Admin overrides: { playlists: { deviceId: playlistId }, liveStreamId }.
-const adminOverrides = { playlists: {}, liveStreamId: null }
+// Admin overrides: { playlists: { deviceId: playlistId }, liveStreamId,
+// apiKey } — apiKey is write-only (stored, never served back).
+const adminOverrides = { playlists: {}, liveStreamId: null, apiKey: null }
 
 async function redisAdminGet() {
   const res = await fetch(`${UPSTASH_URL}/hgetall/${ADMIN_KEY}`, {
@@ -55,12 +56,20 @@ async function redisAdminGet() {
     cache: 'no-store',
   })
   const json = await res.json()
-  const all = json?.result || {}
+  // HGETALL returns a flat array [field, value, field, value, ...].
+  const raw = json?.result || []
+  const pairs = Array.isArray(raw) ? raw : Object.entries(raw)
   const playlists = {}
-  for (const [field, value] of Object.entries(all)) {
-    if (field !== 'liveStreamId') playlists[field] = value
+  let liveStreamId = null
+  let apiKeySet = false
+  for (let i = 0; i < pairs.length; i += 2) {
+    const field = pairs[i]
+    const value = pairs[i + 1]
+    if (field === 'liveStreamId') liveStreamId = value
+    else if (field === 'apiKey') apiKeySet = true // write-only, never returned
+    else if (field) playlists[field] = value
   }
-  return { playlists, liveStreamId: all.liveStreamId || null }
+  return { playlists, liveStreamId, apiKeySet }
 }
 
 // Accepts a raw ID (playlist ≥10 chars, video 11 chars) or a full URL
@@ -99,16 +108,18 @@ async function handleAdmin(req, res, body) {
         enabled: false,
         playlists: adminOverrides.playlists,
         liveStreamId: adminOverrides.liveStreamId,
+        apiKeySet: Boolean(adminOverrides.apiKey),
       })
     }
     try {
-      const { playlists, liveStreamId } = await redisAdminGet()
-      return json(res, 200, { enabled: true, playlists, liveStreamId })
+      const { playlists, liveStreamId, apiKeySet } = await redisAdminGet()
+      return json(res, 200, { enabled: true, playlists, liveStreamId, apiKeySet })
     } catch {
       return json(res, 200, {
         enabled: false,
         playlists: adminOverrides.playlists,
         liveStreamId: adminOverrides.liveStreamId,
+        apiKeySet: Boolean(adminOverrides.apiKey),
       })
     }
   }
@@ -124,6 +135,13 @@ async function handleAdmin(req, res, body) {
 
   const playlists = typeof body?.playlists === 'object' && body.playlists ? body.playlists : {}
   const liveStreamRaw = body?.liveStreamId
+  const apiKeyRaw = body?.apiKey
+  // null/undefined/"" → clear the override; anything else must look like a key.
+  const apiKeyStr = apiKeyRaw == null ? '' : String(apiKeyRaw).trim()
+
+  if (apiKeyStr && apiKeyStr.length < 10) {
+    return json(res, 400, { error: 'INVALID API KEY' })
+  }
 
   if (!hasRedis) {
     // In-memory fallback (per-instance; lost on restart). Keeps local dev
@@ -136,6 +154,9 @@ async function handleAdmin(req, res, body) {
     }
     if (liveStreamRaw !== undefined) {
       adminOverrides.liveStreamId = normalizeId(liveStreamRaw, 11) || null
+    }
+    if (apiKeyRaw !== undefined) {
+      adminOverrides.apiKey = apiKeyStr || null
     }
     return json(res, 200, { ok: true, persistent: false })
   }
@@ -170,9 +191,59 @@ async function handleAdmin(req, res, body) {
         })
       }
     }
+    if (apiKeyRaw !== undefined) {
+      if (apiKeyStr) {
+        await fetch(`${UPSTASH_URL}/hset/${ADMIN_KEY}/apiKey/${encodeURIComponent(apiKeyStr)}`, {
+          headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+          cache: 'no-store',
+        })
+      } else {
+        await fetch(`${UPSTASH_URL}/hdel/${ADMIN_KEY}/apiKey`, {
+          headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+          cache: 'no-store',
+        })
+      }
+    }
     return json(res, 200, { ok: true, persistent: true })
   } catch {
     return json(res, 500, { error: 'STORAGE_FAILED' })
+  }
+}
+
+// YouTube API proxy — injects the write-only admin override key server-side.
+// Same contract as api/yt.js. 503 when no override key is set (the client
+// then keeps calling YouTube directly with its env key).
+async function handleYtProxy(req, res) {
+  const url = new URL(req.url, `http://${req.headers.host}`)
+  const path = url.searchParams.get('path')
+  if (!path || !/^[a-z]+$/.test(path)) return json(res, 400, { error: 'bad path' })
+  url.searchParams.delete('path')
+
+  let key = null
+  if (UPSTASH_URL && UPSTASH_TOKEN) {
+    try {
+      const r = await fetch(`${UPSTASH_URL}/hget/${ADMIN_KEY}/apiKey`, {
+        headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+        cache: 'no-store',
+      })
+      key = (await r.json())?.result || null
+    } catch {
+      key = null
+    }
+  } else {
+    key = adminOverrides.apiKey || null
+  }
+  if (!key) return json(res, 503, { error: 'NO_SERVER_KEY' })
+
+  try {
+    const target = new URL(`https://www.googleapis.com/youtube/v3/${path}`)
+    target.search = new URLSearchParams({ key, ...Object.fromEntries(url.searchParams) })
+    const upstream = await fetch(target.href, { cache: 'no-store' })
+    const body = await upstream.text()
+    res.writeHead(upstream.status, { 'Content-Type': 'application/json' })
+    res.end(body)
+  } catch {
+    return json(res, 500, { error: 'PROXY_FAILED' })
   }
 }
 
@@ -204,6 +275,10 @@ http
         return json(res, 405, { error: 'method not allowed' })
       }
       return handleAdmin(req, res, await readBody(req))
+    }
+    if (path === '/api/yt') {
+      if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
+      return handleYtProxy(req, res)
     }
     if (path !== '/api/presence' || (req.method !== 'GET' && req.method !== 'POST')) {
       return json(res, 404, { error: 'not found' })

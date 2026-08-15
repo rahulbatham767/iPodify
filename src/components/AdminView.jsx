@@ -4,16 +4,21 @@ import { fetchAdminConfig, refreshAdminConfig, saveAdminConfig } from '../lib/ad
 import { Icon } from './Icon'
 
 // Admin console — reached at `/#admin`. Updates the built-in device
-// playlists and the radio live stream at runtime via POST /api/admin/config
-// (x-admin-token header). Overrides persist server-side (Upstash Redis) and
-// the player picks them up on the next page load.
+// playlists, the radio live stream and the YouTube API key at runtime via
+// POST /api/admin/config (x-admin-token header). Overrides persist
+// server-side and the player picks them up on the next page load. The API
+// key is WRITE-ONLY: it can be replaced or cleared here but is never
+// displayed — the endpoint only reports whether an override is active.
 export function AdminView() {
   const [config, setConfig] = useState(null)
   const [playlists, setPlaylists] = useState(null)
   const [liveStream, setLiveStream] = useState('')
+  const [apiKey, setApiKey] = useState('')
   const [token, setToken] = useState('')
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState(null)
+  const [keySaving, setKeySaving] = useState(false)
+  const [keyStatus, setKeyStatus] = useState(null)
 
   useEffect(() => {
     let alive = true
@@ -57,17 +62,50 @@ export function AdminView() {
               ? 'ADMIN DISABLED — SET ADMIN_TOKEN ON THE SERVER'
               : 'FORBIDDEN — WRONG ADMIN TOKEN'
             : json.error === 'NO STORAGE — SET UPSTASH_REDIS_REST_URL/TOKEN'
-              ? 'NO STORAGE — SET UPSTASH REDIS CREDENTIALS'
+              ? 'NO STORAGE — SET STORAGE CREDENTIALS ON THE SERVER'
               : `SAVE FAILED (HTTP ${code})`
         setStatus({ ok: false, text })
         return
       }
-      await refreshAdminConfig()
+      setConfig(await refreshAdminConfig())
       setStatus({ ok: true, text: 'SAVED — RELOAD THE PLAYER TO APPLY' })
     } catch {
       setStatus({ ok: false, text: 'COULD NOT REACH ADMIN ENDPOINT' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  // The API key is write-only: replace or clear it, never read it back.
+  const handleKeySave = async (clear) => {
+    setKeySaving(true)
+    setKeyStatus(null)
+    try {
+      const { ok, status: code, json } = await saveAdminConfig({
+        apiKey: clear ? null : apiKey.trim(),
+        token: token.trim(),
+      })
+      if (!ok) {
+        const text =
+          code === 400
+            ? 'INVALID API KEY'
+            : code === 403
+              ? json.error === 'ADMIN DISABLED — SET ADMIN_TOKEN'
+                ? 'ADMIN DISABLED — SET ADMIN_TOKEN ON THE SERVER'
+                : 'FORBIDDEN — WRONG ADMIN TOKEN'
+              : json.error === 'NO STORAGE — SET UPSTASH_REDIS_REST_URL/TOKEN'
+                ? 'NO STORAGE — SET STORAGE CREDENTIALS ON THE SERVER'
+                : `SAVE FAILED (HTTP ${code})`
+        setKeyStatus({ ok: false, text })
+        return
+      }
+      setApiKey('')
+      setConfig(await refreshAdminConfig())
+      setKeyStatus({ ok: true, text: clear ? 'OVERRIDE CLEARED — DEFAULT KEY ACTIVE' : 'API KEY UPDATED — RELOAD TO APPLY' })
+    } catch {
+      setKeyStatus({ ok: false, text: 'COULD NOT REACH ADMIN ENDPOINT' })
+    } finally {
+      setKeySaving(false)
     }
   }
 
@@ -84,7 +122,7 @@ export function AdminView() {
                 ADMIN CONSOLE
               </h1>
               <p className="font-label-caps text-[10px] text-on-surface-variant tracking-widest">
-                RUNTIME OVERRIDES — PLAYLISTS & LIVE STREAM
+                RUNTIME OVERRIDES — PLAYLISTS, LIVE STREAM & API KEY
               </p>
             </div>
             <a
@@ -110,8 +148,8 @@ export function AdminView() {
                 <p className="font-label-caps text-[10px] text-on-surface-variant tracking-widest flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${config.enabled ? 'bg-tertiary led-glow' : 'bg-error'}`} />
                   {config.enabled
-                    ? 'SHARED STORAGE ONLINE (UPSTASH REDIS)'
-                    : 'PERSISTENCE OFFLINE — OVERRIDES NOT SHARED (REDIS CREDENTIALS MISSING)'}
+                    ? 'SHARED STORAGE ONLINE'
+                    : 'PERSISTENCE OFFLINE — OVERRIDES NOT SHARED ACROSS INSTANCES'}
                 </p>
                 <p className="font-label-caps text-[10px] text-outline tracking-widest">
                   CHANGES TAKE EFFECT AFTER RELOADING THE PLAYER
@@ -119,6 +157,81 @@ export function AdminView() {
               </div>
             )}
           </section>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleKeySave(false)
+            }}
+            className="glass-panel chrome-bezel rounded-lg p-5 mb-4 space-y-4"
+          >
+            <h3 className="font-label-caps text-label-caps text-tertiary-fixed tracking-widest flex items-center gap-2">
+              <Icon name="key" className="text-[16px] text-tertiary" />
+              YOUTUBE API KEY — WRITE-ONLY
+            </h3>
+            <p className="font-label-caps text-[9px] text-outline tracking-widest">
+              THE CURRENT KEY IS NEVER SHOWN — YOU CAN ONLY REPLACE OR CLEAR IT
+            </p>
+            <div className="space-y-2">
+              <label className="block font-label-caps text-[10px] text-tertiary/70 tracking-widest">
+                NEW API KEY <span className="text-outline">(LEAVE EMPTY TO KEEP THE CURRENT ONE)</span>
+              </label>
+              <div className="lcd-screen rounded-sm px-3 py-2">
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="AIza... (never displayed)"
+                  autoComplete="new-password"
+                  className="w-full bg-transparent outline-none font-label-caps text-[11px] text-tertiary placeholder:text-outline"
+                />
+              </div>
+            </div>
+            {!isLoading && (
+              <p className="font-label-caps text-[10px] tracking-widest flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${config.apiKeySet ? 'bg-tertiary led-glow' : 'bg-outline'}`} />
+                {config.apiKeySet
+                  ? 'OVERRIDE ACTIVE — SERVER USES THE ADMIN KEY'
+                  : 'NO OVERRIDE — APP USES ITS DEFAULT KEY'}
+              </p>
+            )}
+            {keyStatus && (
+              <p
+                className={`font-label-caps text-[10px] tracking-widest text-center ${
+                  keyStatus.ok ? 'text-tertiary' : 'text-error'
+                }`}
+              >
+                {keyStatus.text}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={keySaving || isLoading}
+                className="flex-1 chrome-button font-label-caps text-[10px] py-2 px-4 rounded-sm text-tertiary border-tertiary lcd-text-glow hover:text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {keySaving ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-primary led-glow animate-pulse" />
+                    SAVING...
+                  </>
+                ) : (
+                  <>
+                    <Icon name="key" className="text-[14px]" />
+                    SET NEW KEY
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleKeySave(true)}
+                disabled={keySaving || isLoading || !config.apiKeySet}
+                className="flex-1 chrome-button font-label-caps text-[10px] py-2 px-4 rounded-sm text-on-surface-variant hover:text-white transition-colors disabled:opacity-50"
+              >
+                CLEAR OVERRIDE
+              </button>
+            </div>
+          </form>
 
           <form onSubmit={handleSave} className="glass-panel chrome-bezel rounded-lg p-5 space-y-5">
             <div className="space-y-4">
@@ -203,7 +316,7 @@ export function AdminView() {
               )}
             </button>
             <p className="font-label-caps text-[9px] text-outline tracking-widest text-center">
-              EMPTY FIELDS CLEAR THE OVERRIDE — THE .ENV DEFAULT TAKES OVER AGAIN
+              EMPTY FIELDS CLEAR THE OVERRIDE — THE DEFAULT TAKES OVER AGAIN
             </p>
           </form>
         </div>
