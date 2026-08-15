@@ -11,6 +11,7 @@ Built with React + Vite, wired to real YouTube playback through the official IFr
 - **Devices** — built-in "devices" are artists backed by curated YouTube playlists (or `{artist} official audio` search fallback). Pair/unpair your own playlist via Settings; pairing probes the source before saving.
 - **Library** — every track across all devices, paginated with infinite scroll; tap a row to start playing.
 - **Radio** — live-stream channel tuned from a single video ID; live mode never auto-advances.
+- **Admin console** — `/#admin` updates the built-in playlists and the radio live stream at runtime (no rebuild/redeploy). Server-side overrides are stored in Upstash Redis and merged over the env defaults on every page load; writes are protected by an `ADMIN_TOKEN`. See [Admin console](#admin-console).
 - **Queue** — full playlist transmission queue with infinite scroll, exactly one TRANSMITTING row, row-click jumping, auto-advance, and blocked-video self-healing (embed-restricted/removed videos are permanently filtered).
 - **Realtime listener count** — centered in the header. Presence heartbeats (15s) are counted atomically server-side, so thousands of concurrent listeners never conflict. See [Architecture](#architecture).
 - **PWA** — installable on Android Chrome for reliable background playback (iOS Safari limits background audio for hidden iframes regardless — noted in the UI).
@@ -48,8 +49,18 @@ cp .env.example .env
 | `VITE_LIVE_STREAM_ID` | No | Radio live stream video ID. Missing → "STATION OFFLINE". |
 | `VITE_PRESENCE_URL` | No | Presence endpoint override. Defaults to `/api/presence`. |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | No (recommended) | Shared presence store. Set in the Vercel dashboard (and your shell for the local backend). |
+| `ADMIN_TOKEN` | No | Server-side (not a `VITE_` var). Enables writes to `/api/admin/config` from the `/#admin` console. |
 
 Never commit real keys — `.env` is gitignored.
+
+## Admin console
+
+Open `/#admin` to update the built-in device playlists and the radio live stream at runtime — no rebuild, no redeploy:
+
+- `GET /api/admin/config` — current overrides `{ playlists: { deviceId: playlistId }, liveStreamId }`. The player fetches this at boot and merges it over the `VITE_PLAYLIST_*` / `VITE_LIVE_STREAM_ID` defaults.
+- `POST /api/admin/config` — same shape; values accept raw IDs or full URLs, empty values clear an override. Requires the `x-admin-token` header to match the `ADMIN_TOKEN` env var (403 otherwise).
+
+Overrides live in the Upstash Redis hash `ipodify:admin` (shared across all instances). Without `UPSTASH_REDIS_REST_URL`/`TOKEN` the console reports persistence offline and saves are rejected on Vercel; the local `server.js` backend falls back to a per-instance in-memory store, which is enough for local testing.
 
 ## Deployment (Vercel)
 
@@ -61,6 +72,7 @@ Then import the repo on Vercel (framework preset auto-detected: Vite). Set env v
 
 - `VITE_YOUTUBE_API_KEY` (+ optional `VITE_PLAYLIST_*`, `VITE_LIVE_STREAM_ID`)
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` — create a free database at https://upstash.com, copy the REST URL + token.
+- `ADMIN_TOKEN` (optional) — enables the `/#admin` console writes.
 
 `vercel.json` rewrites all non-`/api` routes to `index.html` (deep links + PWA scope) so the `api/presence` function keeps its route. Missing env → the UI guides setup via "SIGNAL LOST" / "NO LIVE SOURCE" panels.
 
@@ -74,6 +86,13 @@ Then import the repo on Vercel (framework preset auto-detected: Vite). Set env v
 
 Because each listener owns its own hidden YouTube iframe (no shared mutable state), presence counts are the only shared data — the design scales to 1000+ concurrent listeners without conflicts.
 
+### Admin overrides
+
+- `api/admin.js` — Vercel serverless: `GET` returns the overrides from the `ipodify:admin` Redis hash; `POST` (auth: `x-admin-token` header == `ADMIN_TOKEN` env) writes them. Values are normalized to bare IDs server-side.
+- `server.js` — identical route locally; falls back to an in-memory overrides map when Redis is absent (per-instance, lost on restart).
+- `src/lib/adminConfig.js` — shared boot-time fetch (single cached promise); `useDeviceStore` merges playlist overrides into the built-ins and `PlayerContext` applies the live-stream override.
+- `src/components/AdminView.jsx` — the `/#admin` console UI (hash-routed in `App.jsx`, outside the player shell).
+
 ### State & data flow
 
 - All player/device state lives in `PlayerContext` (single store, no Zustand): devices, queue, playback, radio, errors. The hidden YouTube player host lives inside the provider.
@@ -85,13 +104,15 @@ Because each listener owns its own hidden YouTube iframe (no shared mutable stat
 
 ```
 api/presence.js          Vercel serverless presence endpoint
-server.js                Local presence backend (zero deps, port 8787)
+api/admin.js             Vercel serverless admin endpoint (/#admin overrides)
+server.js                Local backend: presence + admin (zero deps, port 8787)
 scripts/dev.js           Runs backend + Vite together (npm run dev)
 src/
   components/            Header, Sidebar, NowPlayingPanel (iPod photo scene),
-                         TransmissionQueue, LibraryView, RadioView, ...
+                         TransmissionQueue, LibraryView, RadioView, AdminView, ...
   hooks/                 useYouTubePlayer, useInfiniteLibrary, useListeners, useMediaSession
   lib/youtube.js         Data API v3 fetchers, duration parser, error map
+  lib/adminConfig.js     Admin override fetcher (shared boot-time cache)
   store/                 PlayerContext (player state), useDeviceStore (persisted devices)
   data/devices.js        Built-in devices (artists)
 public/                  PWA: manifest, sw.js, icon.png

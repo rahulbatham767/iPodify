@@ -10,6 +10,8 @@
 // sourceType: "playlist" (curated playlist, saves quota) | "search"
 // sourceValue: playlist ID or search query
 // yearOverride: optional fixed year for the "ARTIST // YEAR" subtitle.
+// envVar: the VITE_PLAYLIST_* env var backing this device (admin overrides
+//         can replace the env value at runtime without a rebuild).
 
 import { extractPlaylistId } from '../lib/youtube.js'
 
@@ -26,6 +28,7 @@ export const defaultDevices = [
     id: "nokia-5233",
     name: "Nokia 5233",
     avatarUrl: null,
+    envVar: "VITE_PLAYLIST_NOKIA_5233",
     ...envSource("Nokia 5233", "VITE_PLAYLIST_NOKIA_5233"),
     yearOverride: 2009,
     isUserAdded: false,
@@ -35,6 +38,7 @@ export const defaultDevices = [
     id: "sony-ericsson-w595",
     name: "Sony Ericsson W595",
     avatarUrl: null,
+    envVar: "VITE_PLAYLIST_SONY_W595",
     ...envSource("Sony Ericsson W595", "VITE_PLAYLIST_SONY_W595"),
     yearOverride: 2008,
     isUserAdded: false,
@@ -44,6 +48,7 @@ export const defaultDevices = [
     id: "samsung-star",
     name: "Samsung Star GT-S5233",
     avatarUrl: null,
+    envVar: "VITE_PLAYLIST_SAMSUNG_STAR",
     ...envSource("Samsung Star GT-S5233", "VITE_PLAYLIST_SAMSUNG_STAR"),
     yearOverride: 2009,
     isUserAdded: false,

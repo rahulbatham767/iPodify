@@ -11,6 +11,7 @@
 - `npm run server` — presence backend alone
 - `npm run build` — production build (verification: must pass)
 - No test/lint/typecheck tooling exists; `npm run build` is the only automated check.
+- `mobile application/` is a separate Expo (React Native + TypeScript) app — its checks are `npx tsc --noEmit` and `npx expo export --platform android` (see its README).
 
 ## File layout
 
@@ -34,6 +35,7 @@
 - Public/queue details: `TransmissionQueue` infinite-scrolls the full playlist (IntersectionObserver sentinel + `loadMoreQueue` in `PlayerContext` paginating via `queuePageToken`; "END OF TRANSMISSION" when the playlist is exhausted; `content-visibility:auto` rows). Built-in devices have no FORGET button — only `isUserAdded` devices can be removed. Header settings icon navigates to the settings view like the sidebar item; the header Bluetooth icon opens `DevicePicker` (reuses `DeviceList` + scan button — the mobile way to pick a device, since the sidebar is hidden below `md`).
 - `public/` — PWA: `manifest.webmanifest`, `sw.js`, `icon.svg`. SW registers only in `PROD` (don't change that; dev caching breaks iteration).
 - `.env.example` — copy to `.env`, set `VITE_YOUTUBE_API_KEY` + optional `VITE_PLAYLIST_*` playlist IDs + `VITE_LIVE_STREAM_ID` (radio). **Never hardcode the key or IDs.** Missing key → "SIGNAL LOST" panel with `NO_API_KEY` message. `.env` is gitignored.
+- `mobile application/` — Expo (React Native + TypeScript) port of the app for iOS/Android. Same design tokens (`src/theme.ts`), same player model (`src/store/PlayerContext.tsx`), hidden 1x1 `react-native-youtube-iframe` host driven via `src/lib/playerHost.ts` bridge. Env: `EXPO_PUBLIC_YOUTUBE_API_KEY`, `EXPO_PUBLIC_PLAYLIST_*`, `EXPO_PUBLIC_LIVE_STREAM_ID` (in `.env`, see `.env.example`). Bottom-tab shell in `App.tsx`, five screens in `src/screens/`. Custom devices persist via AsyncStorage (`ipodify.mobile.devices.v1`).
 - `.opencode/` — ignore (tooling state).
 
 ## Design system (must match exactly)

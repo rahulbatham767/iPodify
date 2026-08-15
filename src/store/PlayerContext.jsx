@@ -3,6 +3,7 @@ import { loadDeviceQueue, describeError, extractVideoId, fetchVideoInfo } from '
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer'
 import { useMediaSession } from '../hooks/useMediaSession'
 import { useDeviceStore } from './useDeviceStore'
+import { fetchAdminConfig } from '../lib/adminConfig'
 
 const PlayerContext = createContext(null)
 
@@ -30,6 +31,19 @@ export function PlayerProvider({ children }) {
   // not run — queue is cleared on tune-in and restored by re-pairing.
   const liveVideoIdRef = useRef(extractVideoId(import.meta.env.VITE_LIVE_STREAM_ID))
   const [radioInfo, setRadioInfo] = useState(null)
+
+  // Admin endpoint override (runtime, shared) beats the env live stream.
+  useEffect(() => {
+    let alive = true
+    fetchAdminConfig().then((cfg) => {
+      if (!alive || !cfg?.liveStreamId) return
+      const videoId = extractVideoId(cfg.liveStreamId)
+      if (videoId) liveVideoIdRef.current = videoId
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const currentTrack = queue[currentTrackIndex] || null
 

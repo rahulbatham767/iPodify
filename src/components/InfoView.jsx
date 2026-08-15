@@ -42,6 +42,7 @@ const SECTIONS = [
       'Copy .env.example → .env',
       'Add your YouTube API key: VITE_YOUTUBE_API_KEY',
       '(Optional) Configure: VITE_PLAYLIST_LOFI, VITE_PLAYLIST_RETRO, VITE_PLAYLIST_SYNTH, VITE_LIVE_STREAM_ID',
+      'Update the built-in playlists and live stream at runtime — open the ADMIN CONSOLE at /#admin (needs ADMIN_TOKEN set on the server).',
     ],
   },
   {

@@ -12,10 +12,22 @@ import { LibraryView } from './components/LibraryView'
 import { ManageDevicesPanel } from './components/ManageDevicesPanel'
 import { RadioView } from './components/RadioView'
 import { InfoView } from './components/InfoView'
+import { AdminView } from './components/AdminView'
 
 export default function App() {
   const [view, setView] = useState('devices')
   const [queueOpen, setQueueOpen] = useState(false)
+  const [adminMode, setAdminMode] = useState(() => window.location.hash === '#admin')
+
+  // Admin console lives at /#admin (not a nav view — owner-only, not shown
+  // in the UI). Leaving it just means navigating to any other hash.
+  useEffect(() => {
+    const onHash = () => setAdminMode(window.location.hash === '#admin')
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
+  if (adminMode) return <AdminView />
 
   // Tactile button-click sound (`public/button.mp3`), played for every
   // <button> press via event delegation. Sound starts inside the click
