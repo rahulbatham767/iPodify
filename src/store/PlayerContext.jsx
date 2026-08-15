@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { loadDeviceQueue, describeError, extractVideoId, fetchVideoInfo, setApiProxyEnabled } from '../lib/youtube'
+import { loadDeviceQueue, describeError, extractVideoId, fetchVideoInfo, setApiProxyEnabled, envKeyConfigured } from '../lib/youtube'
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer'
 import { useMediaSession } from '../hooks/useMediaSession'
 import { useDeviceStore } from './useDeviceStore'
@@ -38,7 +38,7 @@ export function PlayerProvider({ children }) {
     let alive = true
     fetchAdminConfig().then((cfg) => {
       if (!alive || !cfg) return
-      setApiProxyEnabled(cfg.apiKeySet)
+      setApiProxyEnabled(cfg.apiKeySet && !envKeyConfigured())
       if (cfg.liveStreamId) {
         const videoId = extractVideoId(cfg.liveStreamId)
         if (videoId) liveVideoIdRef.current = videoId

@@ -11,6 +11,13 @@ export function setApiProxyEnabled(on) {
   apiProxyEnabled = Boolean(on)
 }
 
+// True when a usable key is set via the env — env beats the admin override
+// so updating VITE_YOUTUBE_API_KEY is always reflected (after a restart).
+export function envKeyConfigured() {
+  const key = API_KEY()
+  return Boolean(key && key !== 'your_key_here')
+}
+
 // One automatic retry on transient network failures (TypeError). HTTP errors
 // and quota responses are not retried.
 async function fetchWithRetry(url, attempts = 2) {
