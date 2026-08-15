@@ -44,9 +44,9 @@ export function Sidebar({ activeView, onNavigate }) {
                 <button
                   type="button"
                   onClick={() => onNavigate(item.key)}
-                  className={`w-full px-4 py-3 flex items-center gap-3 transition-colors duration-200 active:scale-[0.98] ${active
-                      ? 'bg-primary-container/40 text-on-primary-container border-l-4 border-tertiary font-bold'
-                      : 'text-on-surface-variant hover:bg-surface-container-highest border-l-4 border-transparent'
+                  className={`w-full px-4 py-2 flex items-center gap-3 transition-colors duration-200 active:scale-[0.98] ${active
+                    ? 'bg-primary-container/40 text-on-primary-container border-l-4 border-tertiary font-bold'
+                    : 'text-on-surface-variant hover:bg-surface-container-highest border-l-4 border-transparent'
                     }`}
                 >
                   <Icon name={item.icon} filled={active} />

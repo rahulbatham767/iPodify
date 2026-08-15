@@ -12,13 +12,29 @@ export function Header({ onToggleQueue, onNavigate }) {
   return (
     <header className="bg-surface-container border-b-2 border-outline-variant bg-surface-dim border-b-2 border-black/50 ring-1 ring-inset ring-white/10 shadow-[0px_2px_0px_0px_rgba(0,0,0,0.8)] grid grid-cols-[1fr_auto_1fr] items-center w-full px-3 md:px-10 py-2 h-14 sm:h-16 fixed top-0 z-50">
       <div className="flex items-center gap-3 min-w-0">
-        <img
-          alt="iPodify Logo"
-          className="h-10 w-10 object-contain rounded-sm hidden sm:block"
-          src="/icon.png"
-        />
-        <h1 className="font-display-tech text-tertiary-fixed tracking-tighter uppercase text-[17px] sm:text-[24px] lcd-text-glow truncate">
-          iPodify
+        <h1 className="min-w-0">
+          {/* Spotify-style lockup: circular badge + bold wordmark */}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" className="w-[150px] sm:w-[220px] h-auto block" role="img" aria-label="iPodify">
+            {/* Badge — cyan circle with the three sound arcs (dark bars via evenodd holes) */}
+            <path
+              fillRule="evenodd"
+              d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"
+              fill="#00dbe9"
+              transform="translate(8,8) scale(2)"
+            />
+            {/* Wordmark — bold rounded grotesque, Spotify style */}
+            <text
+              x="66"
+              y="45"
+              font-family="'Space Grotesk', 'Arial', sans-serif"
+              font-size="37"
+              font-weight="700"
+              fill="#e8eaf0"
+              letter-spacing="1"
+            >
+              iPodify
+            </text>
+          </svg>
         </h1>
       </div>
       {enabled && (
