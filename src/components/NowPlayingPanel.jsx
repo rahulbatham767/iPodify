@@ -39,6 +39,8 @@ export function NowPlayingPanel({
   pairing = false,
   isPlaying = false,
   disabled = false,
+  playDisabled = false,
+  hasTrack = false,
   onMenu,
   onPrev,
   onNext,
@@ -119,6 +121,14 @@ export function NowPlayingPanel({
                 <span className="flex-1 text-center font-headline-lg text-[10px] font-semibold tracking-[0.05em] text-white/85 truncate">
                   {live ? 'Live Station' : 'Now Playing'}
                 </span>
+                {/* Bluetooth — white when idle, gray when paused, blue glow while transmitting */}
+                <svg viewBox="0 0 24 24" className="w-[10px] h-[10px] shrink-0" aria-hidden="true">
+                  <path
+                    d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"
+                    fill={hasTrack && isPlaying ? '#6ab7ff' : hasTrack ? 'rgba(255,255,255,0.4)' : '#ffffff'}
+                    style={hasTrack && isPlaying ? { filter: 'drop-shadow(0 0 3px rgba(106,183,255,0.95))' } : undefined}
+                  />
+                </svg>
                 <svg viewBox="0 0 22 11" className="w-[17px] h-[9px] shrink-0" aria-hidden="true">
                   <rect x="0.5" y="0.5" width="16.5" height="10" rx="2.5" fill="none" stroke="#fff" strokeWidth="1" opacity="0.85" />
                   <rect x="18" y="3.5" width="2.8" height="4" rx="1" fill="#fff" opacity="0.85" />
@@ -130,10 +140,45 @@ export function NowPlayingPanel({
 
               {/* Song info — centered hierarchy */}
               <div className="px-3 pt-2.5 flex flex-col items-center text-white/90">
-                <p className="font-headline-lg text-[9px] font-medium leading-none text-white/55">{count}</p>
-                <p className="w-full font-headline-lg font-bold text-[22px] leading-[1.15] text-center truncate mt-1.5">{title}</p>
-                <p className="w-full font-headline-lg font-medium text-[16px] leading-[1.2] text-center truncate mt-1">{artist}</p>
-                <p className="w-full font-body-md text-[14px] leading-[1.2] text-center truncate mt-0.5 opacity-70">{album}</p>
+                <p className="font-headline-lg text-[9px] font-medium leading-none text-white/55">
+                  {count}
+                </p>
+
+                <p className="w-full font-headline-lg font-bold text-[22px] leading-[1.15] text-center truncate mt-1.5">
+                  {title}
+                </p>
+
+                <p className="w-full font-headline-lg font-medium text-[16px] leading-[1.2] text-center truncate mt-1">
+                  {artist}
+                </p>
+
+                <p className="w-full font-body-md text-[14px] leading-[1.2] text-center truncate mt-0.5 opacity-70">
+                  {album}
+                </p>
+
+                <div className="w-full flex justify-center mt-3">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-12 h-12"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"
+                      fill={
+                        hasTrack && isPlaying
+                          ? "#6ab7ff"
+                          : hasTrack
+                            ? "rgba(255,255,255,0.4)"
+                            : "#ffffff"
+                      }
+                      style={
+                        hasTrack && isPlaying
+                          ? { filter: "drop-shadow(0 0 3px rgba(106,183,255,0.95))" }
+                          : undefined
+                      }
+                    />
+                  </svg>
+                </div>
               </div>
 
               {/* Progress */}
@@ -160,54 +205,64 @@ export function NowPlayingPanel({
 
           {/* Original circular black click wheel */}
           <div
-            className="relative mt-[30px] w-[220px] h-[220px] rounded-full border border-black/50"
+            className="relative mt-[30px] w-[220px] h-[220px] rounded-[8.75rem] border border-black/50"
             style={{
-              background: 'radial-gradient(circle at 34% 26%, #4c4c4e 0%, #1a1a1c 30%, #0c0c0e 62%, #050506 100%)',
+              background:
+                "radial-gradient(circle at 34% 26%, #4c4c4e 0%, #1a1a1c 30%, #0c0c0e 62%, #050506 100%)",
               boxShadow:
-                'inset 0 5px 12px rgba(0,0,0,0.85), inset 0 -1px 2px rgba(255,255,255,0.06), 0 4px 10px rgba(0,0,0,0.35)',
+                "inset 0 5px 12px rgba(0,0,0,0.85), inset 0 -1px 2px rgba(255,255,255,0.06), 0 4px 10px rgba(0,0,0,0.35)",
             }}
           >
-            {/* MENU — radio mode stops the stream; music mode pauses playback */}
+            {/* MENU */}
             <button
               type="button"
               disabled={disabled}
               onClick={onMenu}
               aria-label="Menu"
-              className="absolute top-0 left-0 w-full h-[27%] flex items-center justify-center font-display-tech text-[11px] font-bold tracking-[0.25em] text-[#e6e6e6] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-default"
+              className="absolute left-1/2 top-[15%] -translate-x-1/2 -translate-y-1/2 w-[90px] h-[40px] flex items-center justify-center font-display-tech text-[11px] font-bold tracking-[0.25em] text-[#e6e6e6] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-default"
             >
               MENU
             </button>
-            {/* PREV */}
+
+            {/* PREVIOUS */}
             <button
               type="button"
               disabled={disabled}
               onClick={onPrev}
               aria-label="Previous track"
-              className="absolute left-0 top-0 h-full w-[25%] flex items-center justify-center text-[#e6e6e6] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-default"
+              className="absolute left-[15%] top-1/2 -translate-x-1/2 -translate-y-1/2 w-[40px] h-[90px] flex items-center justify-center text-[#e6e6e6] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-default"
             >
               <svg viewBox="0 0 24 24" className="w-[17px] h-[17px]" aria-hidden="true">
-                <path d="M14 5v14L4 12l10-7zm6 0v14l-8-5.4V10L20 5z" fill="currentColor" />
+                <path
+                  d="M14 5v14L4 12l10-7zm6 0v14l-8-5.4V10L20 5z"
+                  fill="currentColor"
+                />
               </svg>
             </button>
+
             {/* NEXT */}
             <button
               type="button"
               disabled={disabled}
               onClick={onNext}
               aria-label="Next track"
-              className="absolute right-0 top-0 h-full w-[25%] flex items-center justify-center text-[#e6e6e6] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-default"
+              className="absolute right-[15%] top-1/2 translate-x-1/2 -translate-y-1/2 w-[40px] h-[90px] flex items-center justify-center text-[#e6e6e6] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-default"
             >
               <svg viewBox="0 0 24 24" className="w-[17px] h-[17px]" aria-hidden="true">
-                <path d="M4 5v14l10-7L4 5zm10 0v14l6-7-6-7z" fill="currentColor" />
+                <path
+                  d="M4 5v14l10-7L4 5zm10 0v14l6-7-6-7z"
+                  fill="currentColor"
+                />
               </svg>
             </button>
+
             {/* PLAY / PAUSE / STOP */}
             <button
               type="button"
-              disabled={disabled}
+              disabled={playDisabled}
               onClick={onTogglePlay}
-              aria-label={live ? 'Stop radio' : isPlaying ? 'Pause' : 'Play'}
-              className="absolute bottom-0 left-0 w-full h-[27%] flex items-center justify-center text-[#e6e6e6] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-default"
+              aria-label={live ? "Stop radio" : isPlaying ? "Pause" : "Play"}
+              className="absolute left-1/2 bottom-[15%] -translate-x-1/2 translate-y-1/2 w-[90px] h-[40px] flex items-center justify-center text-[#e6e6e6] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-default"
             >
               {live ? (
                 <svg viewBox="0 0 24 24" className="w-[16px] h-[16px]" aria-hidden="true">
@@ -224,15 +279,31 @@ export function NowPlayingPanel({
                 </svg>
               )}
             </button>
-            {/* White center button — acts as PLAY/STOP */}
+
+            {/* CENTER BUTTON */}
             <button
               type="button"
-              disabled={disabled}
+              disabled={playDisabled}
               aria-label="Select"
               onClick={onTogglePlay}
               className="absolute inset-0 m-auto w-[66px] h-[66px] rounded-full bg-[linear-gradient(180deg,#ffffff,#e8e8e9)] border border-black/20 shadow-[inset_0_3px_6px_rgba(0,0,0,0.25),inset_0_-1px_2px_rgba(255,255,255,0.9),0_1px_2px_rgba(0,0,0,0.35)] active:shadow-[inset_0_6px_12px_rgba(0,0,0,0.35)] active:translate-y-[1px] transition-all disabled:opacity-60 disabled:cursor-default"
             >
-              <span className="block w-full h-full rounded-full bg-[radial-gradient(circle_at_35%_28%,rgba(255,255,255,0.95),rgba(255,255,255,0)_55%)]" />
+              <span className="block w-full h-full rounded-full bg-[radial-gradient(circle_at_35%_28%,rgba(255,255,255,0.95),rgba(255,255,255,0)_55%)] flex items-center justify-center">
+                {live ? (
+                  <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" aria-hidden="true">
+                    <rect x="6" y="6" width="12" height="12" fill="#2a2a2c" />
+                  </svg>
+                ) : isPlaying ? (
+                  <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" aria-hidden="true">
+                    <rect x="6" y="5" width="4.5" height="14" fill="#2a2a2c" />
+                    <rect x="13.5" y="5" width="4.5" height="14" fill="#2a2a2c" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" aria-hidden="true">
+                    <path d="M7 4v16l13-8z" fill="#2a2a2c" />
+                  </svg>
+                )}
+              </span>
             </button>
           </div>
         </div>

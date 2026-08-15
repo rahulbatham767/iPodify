@@ -201,16 +201,6 @@ const next = useCallback(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const togglePlay = useCallback(() => {
-    if (!currentTrackRef.current) return
-    if (isPlayingRef.current) {
-      player.pause()
-    } else {
-      resume()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   // 1-second time sync from the real iframe playback position.
   useEffect(() => {
     if (!playerReady) return
@@ -250,6 +240,23 @@ const next = useCallback(() => {
     },
     [],
   )
+
+  const togglePlay = useCallback(() => {
+    if (!currentTrackRef.current) {
+      // No playlist selected yet — start from the first song of the library
+      // (the first available device's queue).
+      if (radioInfoRef.current) return
+      const first = devicesRef.current[0]
+      if (first) connectDevice(first)
+      return
+    }
+    if (isPlayingRef.current) {
+      player.pause()
+    } else {
+      resume()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectDevice])
 
   const selectDevice = useCallback(
     (deviceId) => {

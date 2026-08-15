@@ -57,11 +57,13 @@ export function NowPlayingHost() {
           live={live}
           pairing={pairing}
           isPlaying={isPlaying}
+          hasTrack={hasTrack}
           disabled={!hasTrack}
+          playDisabled={pairing}
           onMenu={() => (live ? stopRadio() : isPlaying && togglePlay())}
           onPrev={() => hasTrack && prev()}
           onNext={() => hasTrack && next()}
-          onTogglePlay={() => (live ? stopRadio() : hasTrack && togglePlay())}
+          onTogglePlay={() => (live ? stopRadio() : togglePlay())}
         />
       </div>
     </div>
