@@ -6,3 +6,6 @@ dist
 .rar
 iPodify.rar
 mobile_application
+
+.vercel
+.env*

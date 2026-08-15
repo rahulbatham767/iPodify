@@ -88,7 +88,7 @@ Because each listener owns its own hidden YouTube iframe (no shared mutable stat
 
 ### Admin overrides
 
-- `api/admin.js` — Vercel serverless: `GET` returns the overrides from the `ipodify:admin` Redis hash; `POST` (auth: `x-admin-token` header == `ADMIN_TOKEN` env) writes them. Values are normalized to bare IDs server-side.
+- `api/admin/config.js` — Vercel serverless: `GET` returns the overrides from the `ipodify:admin` Redis hash; `POST` (auth: `x-admin-token` header == `ADMIN_TOKEN` env) writes them. Values are normalized to bare IDs server-side.
 - `server.js` — identical route locally; falls back to an in-memory overrides map when Redis is absent (per-instance, lost on restart).
 - `src/lib/adminConfig.js` — shared boot-time fetch (single cached promise); `useDeviceStore` merges playlist overrides into the built-ins and `PlayerContext` applies the live-stream override.
 - `src/components/AdminView.jsx` — the `/#admin` console UI (hash-routed in `App.jsx`, outside the player shell).
@@ -104,7 +104,7 @@ Because each listener owns its own hidden YouTube iframe (no shared mutable stat
 
 ```
 api/presence.js          Vercel serverless presence endpoint
-api/admin.js             Vercel serverless admin endpoint (/#admin overrides)
+api/admin/config.js       Vercel serverless admin endpoint (/#admin overrides)
 server.js                Local backend: presence + admin (zero deps, port 8787)
 scripts/dev.js           Runs backend + Vite together (npm run dev)
 src/

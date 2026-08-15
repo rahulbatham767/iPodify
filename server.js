@@ -127,7 +127,7 @@ async function handleAdmin(req, res, body) {
 
   if (!hasRedis) {
     // In-memory fallback (per-instance; lost on restart). Keeps local dev
-    // usable without Upstash — on Vercel this path is never hit (api/admin.js
+    // usable without Upstash — on Vercel this path is never hit (api/admin/config.js
     // rejects writes without storage).
     for (const [field, value] of Object.entries(playlists)) {
       const id = normalizeId(value, 10)
