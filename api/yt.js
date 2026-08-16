@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   if (pathname !== '/api/yt') return json(res, 404, { error: 'not found' })
 
   const path = searchParams.get('path')
-  if (!path || !/^[a-z]+$/.test(path)) return json(res, 400, { error: 'bad path' })
+  if (!path || !/^[a-zA-Z]+$/.test(path)) return json(res, 400, { error: 'bad path' })
   searchParams.delete('path')
 
   const url = process.env.UPSTASH_REDIS_REST_URL

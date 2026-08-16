@@ -216,7 +216,7 @@ async function handleAdmin(req, res, body) {
 async function handleYtProxy(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`)
   const path = url.searchParams.get('path')
-  if (!path || !/^[a-z]+$/.test(path)) return json(res, 400, { error: 'bad path' })
+  if (!path || !/^[a-zA-Z]+$/.test(path)) return json(res, 400, { error: 'bad path' })
   url.searchParams.delete('path')
 
   let key = null
