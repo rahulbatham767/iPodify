@@ -1,6 +1,25 @@
 // YouTube Data API v3 helpers. Always read the key from the environment —
-// never hardcode it.
-const API_KEY = () => import.meta.env.VITE_YOUTUBE_API_KEY
+// never hardcode it. Primary key VITE_YOUTUBE_API_KEY; when it's missing or
+// exhausted (quota), fall back to VITE_YOUTUBE_API_KEY_2.
+const API_KEYS = () =>
+  [import.meta.env.VITE_YOUTUBE_API_KEY, import.meta.env.VITE_YOUTUBE_API_KEY_2].filter(
+    (k) => Boolean(k) && k !== 'your_key_here',
+  )
+
+// When an admin-override API key exists (set write-only via the admin
+// console), YouTube calls are routed through the server-side /api/yt proxy,
+// which injects the key — so it can be changed but never read back. Without
+// an override, calls go straight to Google with the env key (unchanged).
+let apiProxyEnabled = false
+export function setApiProxyEnabled(on) {
+  apiProxyEnabled = Boolean(on)
+}
+
+// True when a usable key is set via the env — env beats the admin override
+// so updating VITE_YOUTUBE_API_KEY is always reflected (after a restart).
+export function envKeyConfigured() {
+  return API_KEYS().length > 0
+}
 
 // One automatic retry on transient network failures (TypeError). HTTP errors
 // and quota responses are not retried.
@@ -15,38 +34,60 @@ async function fetchWithRetry(url, attempts = 2) {
   }
 }
 
-function youtubeApi(path, params) {
-  const key = API_KEY()
-  if (!key || key === 'your_key_here') {
+function handleStatus(res) {
+  if (res.status === 403) {
+    throw new Error('QUOTA_EXCEEDED')
+  }
+  if (!res.ok) {
+    throw new Error(`HTTP_${res.status}`)
+  }
+  return res.json()
+}
+
+function mapFetchError(e, url) {
+  if (e?.message === 'NO_API_KEY' || e?.message === 'QUOTA_EXCEEDED' || e?.message?.startsWith('HTTP_')) {
+    throw e
+  }
+  // Network-level failure (DNS, connection, extension blocking). Attach
+  // the raw reason so the SIGNAL LOST panel can show a real diagnostic.
+  console.error('[soniclink] YouTube API fetch failed:', url?.href ?? url, e)
+  const err = new Error('FETCH_FAILED')
+  err.detail = e?.message || 'NETWORK_ERROR'
+  throw err
+}
+
+async function youtubeApi(path, params) {
+  if (apiProxyEnabled) {
+    // Server-side key injection. 503 = no override key set → surface as a
+    // missing key so the SIGNAL LOST panel guides setup.
+    const url = new URL('/api/yt', window.location.origin)
+    url.search = new URLSearchParams({ path, ...params })
+    return fetchWithRetry(url)
+      .then((res) => (res.status === 503 ? Promise.reject(new Error('NO_API_KEY')) : handleStatus(res)))
+      .catch((e) => mapFetchError(e, url))
+  }
+  const keys = API_KEYS()
+  if (!keys.length) {
     throw new Error('NO_API_KEY')
   }
-  const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`)
-  url.search = new URLSearchParams({ key, ...params })
-  return fetchWithRetry(url)
-    .then(async (res) => {
-      if (res.status === 403) {
-        throw new Error('QUOTA_EXCEEDED')
-      }
-      if (!res.ok) {
-        throw new Error(`HTTP_${res.status}`)
-      }
-      return res.json()
-    })
-    .catch((e) => {
-      if (e?.message === 'NO_API_KEY' || e?.message === 'QUOTA_EXCEEDED' || e?.message?.startsWith('HTTP_')) {
-        throw e
-      }
-      // Network-level failure (DNS, connection, extension blocking). Attach
-      // the raw reason so the SIGNAL LOST panel can show a real diagnostic.
-      console.error('[soniclink] YouTube API fetch failed:', url.href, e)
-      const err = new Error('FETCH_FAILED')
-      err.detail = e?.message || 'NETWORK_ERROR'
-      throw err
-    })
+  // Try each key in order; 403/quota on one key falls through to the next.
+  let lastErr = null
+  for (const key of keys) {
+    const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`)
+    url.search = new URLSearchParams({ key, ...params })
+    try {
+      return await fetchWithRetry(url).then(handleStatus)
+    } catch (e) {
+      if (e?.message !== 'QUOTA_EXCEEDED') throw mapFetchError(e, url)
+      lastErr = e
+    }
+  }
+  // Every key is exhausted — surface the quota error.
+  throw mapFetchError(lastErr || new Error('API_ERROR'), null)
 }
 
 export const YT_ERROR_MESSAGES = {
-  NO_API_KEY: 'YOUTUBE API KEY MISSING — SET VITE_YOUTUBE_API_KEY IN .env',
+  NO_API_KEY: 'YOUTUBE API KEY MISSING — SET VITE_YOUTUBE_API_KEY IN .env OR CONFIGURE IN ADMIN',
   QUOTA_EXCEEDED: 'YOUTUBE API QUOTA EXCEEDED — RETRY LATER',
   HTTP_403: 'YOUTUBE API QUOTA EXCEEDED — RETRY LATER',
   HTTP_429: 'YOUTUBE API RATE LIMIT HIT — PAUSE AND RETRY',

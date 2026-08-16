@@ -11,7 +11,7 @@ Built with React + Vite, wired to real YouTube playback through the official IFr
 - **Devices** — built-in "devices" are artists backed by curated YouTube playlists (or `{artist} official audio` search fallback). Pair/unpair your own playlist via Settings; pairing probes the source before saving.
 - **Library** — every track across all devices, paginated with infinite scroll; tap a row to start playing.
 - **Radio** — live-stream channel tuned from a single video ID; live mode never auto-advances.
-- **Admin console** — `/#admin` updates the built-in playlists and the radio live stream at runtime (no rebuild/redeploy). Server-side overrides are stored in Upstash Redis and merged over the env defaults on every page load; writes are protected by an `ADMIN_TOKEN`. See [Admin console](#admin-console).
+- **Admin console** — `/#admin` updates the built-in playlists, the radio live stream and the YouTube API key at runtime (no rebuild/redeploy). Server-side overrides are stored in Upstash Redis and merged over the env defaults on every page load; writes are protected by an `ADMIN_TOKEN`. The API key is **write-only** — an admin can replace/clear it but never read it back; when an override is active, YouTube calls are proxied server-side (`/api/yt`) so the key is never exposed to the client. See [Admin console](#admin-console).
 - **Queue** — full playlist transmission queue with infinite scroll, exactly one TRANSMITTING row, row-click jumping, auto-advance, and blocked-video self-healing (embed-restricted/removed videos are permanently filtered).
 - **Realtime listener count** — centered in the header. Presence heartbeats (15s) are counted atomically server-side, so thousands of concurrent listeners never conflict. See [Architecture](#architecture).
 - **PWA** — installable on Android Chrome for reliable background playback (iOS Safari limits background audio for hidden iframes regardless — noted in the UI).
@@ -55,10 +55,11 @@ Never commit real keys — `.env` is gitignored.
 
 ## Admin console
 
-Open `/#admin` to update the built-in device playlists and the radio live stream at runtime — no rebuild, no redeploy:
+Open `/#admin` to update the built-in device playlists, the radio live stream and the YouTube API key at runtime — no rebuild, no redeploy:
 
-- `GET /api/admin/config` — current overrides `{ playlists: { deviceId: playlistId }, liveStreamId }`. The player fetches this at boot and merges it over the `VITE_PLAYLIST_*` / `VITE_LIVE_STREAM_ID` defaults.
-- `POST /api/admin/config` — same shape; values accept raw IDs or full URLs, empty values clear an override. Requires the `x-admin-token` header to match the `ADMIN_TOKEN` env var (403 otherwise).
+- `GET /api/admin/config` — current overrides `{ playlists: { deviceId: playlistId }, liveStreamId, apiKeySet }`. The player fetches this at boot and merges it over the `VITE_PLAYLIST_*` / `VITE_LIVE_STREAM_ID` defaults.
+- `POST /api/admin/config` — same shape plus an optional `apiKey`; values accept raw IDs or full URLs, empty values clear an override. Requires the `x-admin-token` header to match the `ADMIN_TOKEN` env var (403 otherwise).
+- The API key is **write-only**: `GET` returns only `apiKeySet`, never the key. When an override is set, `src/lib/youtube.js` routes calls through `api/yt.js` (`/api/yt`), which injects the key server-side; with no override the client keeps calling YouTube directly with its env key.
 
 Overrides live in the Upstash Redis hash `ipodify:admin` (shared across all instances). Without `UPSTASH_REDIS_REST_URL`/`TOKEN` the console reports persistence offline and saves are rejected on Vercel; the local `server.js` backend falls back to a per-instance in-memory store, which is enough for local testing.
 
@@ -88,9 +89,10 @@ Because each listener owns its own hidden YouTube iframe (no shared mutable stat
 
 ### Admin overrides
 
-- `api/admin/config.js` — Vercel serverless: `GET` returns the overrides from the `ipodify:admin` Redis hash; `POST` (auth: `x-admin-token` header == `ADMIN_TOKEN` env) writes them. Values are normalized to bare IDs server-side.
-- `server.js` — identical route locally; falls back to an in-memory overrides map when Redis is absent (per-instance, lost on restart).
-- `src/lib/adminConfig.js` — shared boot-time fetch (single cached promise); `useDeviceStore` merges playlist overrides into the built-ins and `PlayerContext` applies the live-stream override.
+- `api/admin/config.js` — Vercel serverless: `GET` returns the overrides from the `ipodify:admin` Redis hash (API key only as an `apiKeySet` flag — write-only); `POST` (auth: `x-admin-token` header == `ADMIN_TOKEN` env) writes them. Values are normalized to bare IDs server-side.
+- `api/yt.js` — Vercel serverless YouTube proxy: forwards `/api/yt` calls to Google with the override key injected server-side; 503 when no override exists (client falls back to its env key).
+- `server.js` — identical routes locally; falls back to an in-memory overrides map when Redis is absent (per-instance, lost on restart).
+- `src/lib/adminConfig.js` — shared boot-time fetch (single cached promise); `useDeviceStore` merges playlist overrides into the built-ins, `PlayerContext` applies the live-stream override and enables proxy mode when an API-key override is set.
 - `src/components/AdminView.jsx` — the `/#admin` console UI (hash-routed in `App.jsx`, outside the player shell).
 
 ### State & data flow
@@ -105,6 +107,7 @@ Because each listener owns its own hidden YouTube iframe (no shared mutable stat
 ```
 api/presence.js          Vercel serverless presence endpoint
 api/admin/config.js       Vercel serverless admin endpoint (/#admin overrides)
+api/yt.js                  Vercel serverless YouTube proxy (write-only API key)
 server.js                Local backend: presence + admin (zero deps, port 8787)
 scripts/dev.js           Runs backend + Vite together (npm run dev)
 src/

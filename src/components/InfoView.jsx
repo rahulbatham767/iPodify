@@ -6,7 +6,7 @@ const SECTIONS = [
     title: 'ABOUT',
     body: [
       'iPodify is a mid-2000s Bluetooth radio-styled music player for the web. Pair a device (an artist with a curated YouTube playlist), tune the radio, or browse the combined library.',
-      'Built with React + Vite and wired to real YouTube playback through the IFrame Player API — audio-only, delivered through a hidden 1x1 player instance.',
+      'Built for the web and wired to real YouTube playback — audio-only, delivered through a hidden player instance.',
     ],
   },
   {
@@ -29,7 +29,7 @@ const SECTIONS = [
         text: 'If music fails to load:',
         sub: [
           'Verify your VITE_YOUTUBE_API_KEY is valid.',
-          'Check that your YouTube Data API daily quota has not been exhausted.',
+          'Check that your YouTube API daily quota has not been exhausted.',
           'Ensure the playlist is public and embeddable on third-party websites.',
         ],
       },
@@ -51,8 +51,8 @@ const SECTIONS = [
     body: [
       'iPODIFY is an independent project created and developed by Rahul Batham as a portfolio and UI engineering showcase.',
       'This project is not affiliated with, endorsed by, or sponsored by Apple, Sony, YouTube, or Google.',
-      'All music, artwork, and video content remains the property of its respective copyright owners and is streamed through the official YouTube IFrame Player API. No media is hosted, copied, or downloaded by this application.',
-      'The YouTube Data API key is used only for client-side API requests during development and should never be committed to the repository.',
+      'All music, artwork, and video content remains the property of its respective copyright owners and is streamed through the official YouTube player. No media is hosted, copied, or downloaded by this application.',
+      'The YouTube API key is used only for playback requests and should never be committed to the repository.',
       'This project is intended for educational, experimental, and portfolio purposes.',
     ],
   },
@@ -63,7 +63,7 @@ const SECTIONS = [
       '© 2026 Rahul Batham. All rights reserved.',
       'iPODIFY — Designed & developed by Rahul Batham.',
       'Design language: Cyanide Tech · Typography: Space Mono, Space Grotesk & Hanken Grotesk · Icons: Google Material Symbols',
-      'A handcrafted React + TypeScript recreation of a nostalgic iPod experience with a fully functional YouTube-powered music player.',
+      'A handcrafted recreation of a nostalgic iPod experience with a fully functional YouTube-powered music player.',
     ],
   },
 ]

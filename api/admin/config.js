@@ -1,12 +1,16 @@
 // Admin config — Vercel serverless function.
-// GET  /api/admin/config                    → current overrides
-// POST /api/admin/config { playlists, liveStreamId } + `x-admin-token` header
+// GET  /api/admin/config                    → current overrides (never the API key)
+// POST /api/admin/config { playlists, liveStreamId, apiKey } + `x-admin-token` header
 //
-// Lets the owner update the built-in device playlists and the radio live
-// stream at runtime, without rebuilding/redeploying the app. Overrides are
-// stored in the Upstash Redis hash `ipodify:admin` (field per device id +
-// `liveStreamId`); the client fetches them at boot and merges them over the
-// env-derived defaults.
+// Lets the owner update the built-in device playlists, the radio live stream
+// and the YouTube API key at runtime, without rebuilding/redeploying the app.
+// Overrides are stored in the Upstash Redis hash `ipodify:admin` (field per
+// device id + `liveStreamId` + `apiKey`); the client fetches them at boot and
+// merges them over the env-derived defaults.
+//
+// The API key is WRITE-ONLY: GET returns only an `apiKeySet` boolean, never
+// the key itself. When an override key exists, the client routes YouTube API
+// calls through /api/yt, where the server injects the key.
 //
 // Writes require the `x-admin-token` header to match the ADMIN_TOKEN env var.
 // Without ADMIN_TOKEN configured, writes are rejected (403). Without Upstash
@@ -66,24 +70,32 @@ export default async function handler(req, res) {
   }
 
   // GET — read the current overrides (public; the player needs them at boot).
+  // The API key override is write-only: only an `apiKeySet` flag is returned,
+  // never the key itself.
   if (req.method === 'GET') {
     if (!hasRedis) {
-      return json(res, 200, { enabled: false, playlists: {}, liveStreamId: null })
+      return json(res, 200, { enabled: false, playlists: {}, liveStreamId: null, apiKeySet: false })
     }
     try {
       const result = await fetch(`${url}/hgetall/${KEY}`, auth).then((r) => r.json())
-      const all = result?.result || {}
+      // HGETALL returns a flat array [field, value, field, value, ...].
+      const raw = result?.result || []
+      const pairs = Array.isArray(raw)
+        ? raw
+        : Object.entries(raw)
       const playlists = {}
-      for (const [field, value] of Object.entries(all)) {
-        if (field !== 'liveStreamId') playlists[field] = value
+      let liveStreamId = null
+      let apiKeySet = false
+      for (let i = 0; i < pairs.length; i += 2) {
+        const field = pairs[i]
+        const value = pairs[i + 1]
+        if (field === 'liveStreamId') liveStreamId = value
+        else if (field === 'apiKey') apiKeySet = true
+        else if (field) playlists[field] = value
       }
-      return json(res, 200, {
-        enabled: true,
-        playlists,
-        liveStreamId: all.liveStreamId || null,
-      })
+      return json(res, 200, { enabled: true, playlists, liveStreamId, apiKeySet })
     } catch {
-      return json(res, 200, { enabled: false, playlists: {}, liveStreamId: null })
+      return json(res, 200, { enabled: false, playlists: {}, liveStreamId: null, apiKeySet: false })
     }
   }
 
@@ -103,6 +115,14 @@ export default async function handler(req, res) {
   const body = req.body || {}
   const playlists = typeof body.playlists === 'object' && body.playlists ? body.playlists : {}
   const liveStreamRaw = body.liveStreamId
+  const apiKeyRaw = body.apiKey
+  // null/undefined/"" → clear the override; anything else must look like a key.
+  const apiKeyStr = apiKeyRaw == null ? '' : String(apiKeyRaw).trim()
+
+  // API keys look like `AIza...` (~39 chars). Anything shorter is a typo.
+  if (apiKeyStr && apiKeyStr.length < 10) {
+    return json(res, 400, { error: 'INVALID API KEY' })
+  }
 
   try {
     for (const [field, value] of Object.entries(playlists)) {
@@ -120,6 +140,14 @@ export default async function handler(req, res) {
         await fetch(`${url}/hset/${KEY}/liveStreamId/${encodeURIComponent(id)}`, auth)
       } else {
         await fetch(`${url}/hdel/${KEY}/liveStreamId`, auth)
+      }
+    }
+    if (apiKeyRaw !== undefined) {
+      const safeField = 'apiKey'
+      if (apiKeyStr) {
+        await fetch(`${url}/hset/${KEY}/${safeField}/${encodeURIComponent(apiKeyStr)}`, auth)
+      } else {
+        await fetch(`${url}/hdel/${KEY}/${safeField}`, auth)
       }
     }
     return json(res, 200, { ok: true })
